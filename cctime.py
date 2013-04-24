@@ -6,8 +6,6 @@ import subprocess
 import sys
 import time
 
-from math import exp, log
-
 def compile(cc, opts, args):
   cmd = '%s %s %s %s' % (cc,
                          '' if opts.c is None else '-c %s' % opts.c,
@@ -35,6 +33,8 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('-n', type=int, default=1,
                       help='number of times to compile')
+  parser.add_argument('--ref', type=str, default=None,
+                      help='path to reference compiler executable')
   parser.add_argument('csv',
                       help='path to output csv file (will be appended)')
   parser.add_argument('cc', 
@@ -43,32 +43,37 @@ def main():
                       help='compilation arguments passed to cc')
   (opts, args) = parser.parse_known_args()
 
-  cc_ref = 'g++'
-
   # Parse the remainder args
   parser = argparse.ArgumentParser()
   parser.add_argument('-c')
   parser.add_argument('-o')
   (cc_opts, cc_args) = parser.parse_known_args(opts.cc_args)
 
+  # re-escape strings in the cc arguments
   cc_args = [x.replace('"', '\\"') for x in cc_args]
 
   if cc_opts.c is None:
     # no -c to determine the file so just skip this and compile only.
     compile(opts.cc, cc_opts, cc_args)
   else:
-    syntax_ref, total_ref = time_compiler(opts.n, cc_ref, cc_opts, cc_args)
+    # time the reference compiler if requested
+    if opts.ref is not None:
+      syntax_ref, total_ref = time_compiler(opts.n, opts.ref, cc_opts, cc_args)
+    # time the target compiler
     syntax, total = time_compiler(opts.n, opts.cc, cc_opts, cc_args)
 
+    # open the output csv file and write the results. The file is locked
+    # so it will work with make -jN.
     with open(opts.csv, 'a') as out:
       fcntl.flock(out, fcntl.LOCK_EX)
       out.write('%s' % cc_opts.c)
       def write_run(r):
         out.write(', %d, %s' % (len(r), ', '.join(str(x) for x in r)))
-      write_run(syntax_ref)
-      write_run(total_ref)
       write_run(syntax)
       write_run(total)
+      if opts.ref is not None:
+        write_run(syntax_ref)
+        write_run(total_ref)
       out.write('\n')
       fcntl.flock(out, fcntl.LOCK_UN)
   
