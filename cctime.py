@@ -66,9 +66,9 @@ def main():
     # so it will work with make -jN.
     with open(opts.csv, 'a') as out:
       fcntl.flock(out, fcntl.LOCK_EX)
-      out.write('%s' % cc_opts.c)
+      out.write('%s, %d' % (cc_opts.c, opts.n))
       def write_run(r):
-        out.write(', %d, %s' % (len(r), ', '.join(str(x) for x in r)))
+        out.write(', %s' % (', '.join(str(x) for x in r)))
       write_run(syntax)
       write_run(total)
       if opts.ref is not None:
